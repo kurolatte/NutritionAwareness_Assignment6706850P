@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Tracker Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <h1>Login</h1>
+    <form id="login-form">
+        <input type="text" id="login-username" placeholder="Username" required>
+        <input type="password" id="login-password" placeholder="Password" required>
+        <button type="submit">Login</button>
+    </form>
+
+    <h1>Add New Food Item</h1>
+    <form id="add-food-form">
+        <input type="text" id="food-name" placeholder="Food Name" required>
+        <input type="text" id="nutritional-info" placeholder="Nutritional Info" required>
+        <input type="text" id="dietary-restrictions" placeholder="Dietary Restrictions">
+        <label>
+            <input type="checkbox" id="suitable-for-elderly"> Suitable for Elderly
+        </label>
+        <input type="text" id="additional-notes" placeholder="Additional Notes">
+        <button type="submit">Add Food Item</button>
+    </form>
+
+    <h1>Log Food to User</h1>
+    <form id="food-log-form">
+        <select id="food-item-select" required>
+            <option value="">Select Food Item</option>
+        </select>
+        <input type="number" id="quantity" placeholder="Quantity" required min="1">
+        <button type="submit">Log Food</button>
+    </form>
+
+    <h1>Food Items</h1>
+    <ul id="food-list"></ul>
+
+    <h1>Users</h1>
+    <ul id="user-list"></ul>
+    
+    <h1>View Your Food Log</h1>
+    <h2>Your Food Log</h2>
+    <ul id="user-food-log-list"></ul>
+
+    <script>
+        let loggedInUserId = null; // Store logged-in user's ID
+
+        // LOGIN
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const response = await fetch('http://localhost:3000/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    loggedInUserId = data.userId; // Store the logged-in user's ID
+                    alert('Login Successful!');
+                    loadFoodItems();
+                    loadUsers();
+                    loadUserFoodLog(); // Load the food log after login
+                } else {
+                    alert(data.message || 'Login failed');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('An error occurred during login.');
+            }
+        });
+
+        // ADD NEW FOOD ITEM
+        document.getElementById('add-food-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const foodName = document.getElementById('food-name').value;
+            const nutritionalInfo = document.getElementById('nutritional-info').value;
+            const dietaryRestrictions = document.getElementById('dietary-restrictions').value || '';
+            const suitableForElderly = document.getElementById('suitable-for-elderly').checked;
+            const additionalNotes = document.getElementById('additional-notes').value || '';
+
+            try {
+                const response = await fetch('http://localhost:3000/fooditems', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        foodName,
+                        nutritionalInfo,
+                        dietaryRestrictions,
+                        suitableForElderly,
+                        additionalNotes
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('Food item added successfully!');
+                    loadFoodItems();
+                } else {
+                    alert(data.message || 'Failed to add food item');
+                }
+            } catch (error) {
+                console.error('Add food error:', error);
+                alert('An error occurred while adding food item.');
+            }
+        });
+
+        // LOG FOOD TO USER'S LOG
+        document.getElementById('food-log-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!loggedInUserId) {
+                alert('Please login first!');
+                return;
+            }
+
+            const foodItemId = parseInt(document.getElementById('food-item-select').value, 10);
+            const quantity = document.getElementById('quantity').value;
+
+            if (!foodItemId || quantity <= 0) {
+                alert('Invalid food item or quantity');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:3000/foodlogs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ userId: loggedInUserId, foodItemId, quantity }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('Food logged successfully!');
+                    loadFoodItems(); // Optional refresh
+                    loadUserFoodLog(); // Refresh food log
+                } else {
+                    alert(data.message || 'Failed to log food');
+                }
+            } catch (error) {
+                console.error('Log food error:', error);
+                alert('An error occurred while logging food.');
+            }
+        });
+
+        // LOAD FOOD ITEMS FOR DROPDOWN + LIST
+        async function loadFoodItems() {
+            try {
+                const response = await fetch('http://localhost:3000/fooditems');
+                const data = await response.json();
+
+                const select = document.getElementById('food-item-select');
+                select.innerHTML = '<option value="">Select Food Item</option>';
+
+                const list = document.getElementById('food-list');
+                list.innerHTML = '';
+
+                data.forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item.foodItemId; // Match your backend field
+                    option.textContent = `${item.foodName} - ${item.nutritionalInfo}`;
+                    select.appendChild(option);
+
+                    const listItem = document.createElement('li');
+                    listItem.textContent = `${item.foodName} - ${item.nutritionalInfo}`;
+                    list.appendChild(listItem);
+                });
+            } catch (error) {
+                console.error('Error loading food items:', error);
+                document.getElementById('food-list').innerHTML = '<li>Error loading food items</li>';
+            }
+        }
+
+        // LOAD USER FOOD LOG FOR THE LOGGED-IN USER
+async function loadUserFoodLog() {
+    if (!loggedInUserId) {
+        alert('Please login first!');
+        return;
+    }
+
+    try {
+        const token = localStorage.getItem('jwtToken'); // Assuming you store the token in localStorage
+
+        if (!token) {
+            alert('No valid token found, please login again.');
+            return;
+        }
+
+        const response = await fetch(`http://localhost:3000/foodlogs/${loggedInUserId}`, {
+            method: 'GET',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`  // Include the JWT token here
+            }
+        });
+
+        const data = await response.json();
+
+        const foodLogList = document.getElementById('user-food-log-list');
+        foodLogList.innerHTML = '';  // Clear previous logs
+
+        if (data.length === 0) {
+            foodLogList.innerHTML = '<li>No food logs found for you.</li>';
+        } else {
+            data.forEach(log => {
+                const listItem = document.createElement('li');
+                listItem.textContent = `${log.foodName} - Quantity: ${log.quantity}`;
+                foodLogList.appendChild(listItem);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading food log:', error);
+        alert('An error occurred while loading your food log.');
+    }
+}
+
+        // LOAD USERS
+        async function loadUsers() {
+            try {
+                const response = await fetch('http://localhost:3000/users');
+                const data = await response.json();
+
+                const list = document.getElementById('user-list');
+                list.innerHTML = data.map(user => `<li>${user.Username} (${user.Email})</li>`).join('');
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('user-list').innerHTML = '<li>Error loading users</li>';
+            }
+        }
+
+        // Initial load
+        loadFoodItems();
+        loadUsers();
+    </script>
+</body>
+
+</html>

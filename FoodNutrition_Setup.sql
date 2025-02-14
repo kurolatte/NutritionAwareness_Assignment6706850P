@@ -39,3 +39,9 @@ CREATE TABLE UserFoodLogs (
     LoggedAt DATETIME DEFAULT GETDATE()
 );
 GO
+
+
+--SELECT username, email, passwordHash FROM users;
+--DELETE FROM Users WHERE Username = 'testing1';
+--DBCC CHECKIDENT ('Users', RESEED, 0);
+--SELECT * FROM UserFoodLogs;
